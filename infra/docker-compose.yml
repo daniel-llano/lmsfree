@@ -1,0 +1,83 @@
+# Local stack: PostgreSQL, the API on :5270, the web app on :5174, and Mailpit on :8025 to read outgoing mail.
+# Passwords and the signing key here are for this machine only.
+name: lmsfree
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: lmsfree-postgres
+    environment:
+      POSTGRES_DB: lmsfree
+      POSTGRES_USER: lmsfree
+      POSTGRES_PASSWORD: lmsfree_local
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lmsfree -d lmsfree"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    container_name: lmsfree-mailpit
+    ports:
+      - "8025:8025"
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: lmsfree-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    ports:
+      - "5270:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Lms: "Host=postgres;Database=lmsfree;Username=lmsfree;Password=lmsfree_local"
+      Database__MigrateOnStartup: "true"
+      SeedSampleData: "true"
+      EnableApiDocs: "true"
+      App__PublicUrl: "http://localhost:5174"
+      Jwt__Secret: "local-compose-signing-key-replace-before-deploying"
+      Bootstrap__AdminEmail: admin@lmsfree.local
+      Bootstrap__AdminPassword: Admin@1234
+      Email__Smtp__Host: mailpit
+      Email__Smtp__Port: "1025"
+      Email__Smtp__UseStartTls: "false"
+      RateLimiting__AuthPermitsPerMinute: "60"
+    volumes:
+      - uploads:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health/ready HTTP/1.0\r\n\r\n' >&3 && grep -q ' 200 ' <&3"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+      start_period: 20s
+
+  web:
+    build:
+      context: ../web
+    container_name: lmsfree-web
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "5174:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pg_data:
+  uploads:

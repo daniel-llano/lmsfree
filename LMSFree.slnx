@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/LMSFree.Api/LMSFree.Api.csproj" />
+    <Project Path="src/LMSFree.Domain/LMSFree.Domain.csproj" />
+    <Project Path="src/LMSFree.Infrastructure/LMSFree.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/LMSFree.Api.Tests/LMSFree.Api.Tests.csproj" />
+  </Folder>
+</Solution>
